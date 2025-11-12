@@ -19,7 +19,11 @@ import {BaseVault, VERSION} from "@src/utils/BaseVault.sol";
 import {BaseTest} from "@test/BaseTest.t.sol";
 import {BaseVaultMock} from "@test/mocks/BaseVaultMock.t.sol";
 
+import {ReentrancyGuardUpgradeable} from "@openzeppelin-upgradeable/contracts/utils/ReentrancyGuardUpgradeable.sol";
 import {BaseVaultMockMaxDeposit0} from "@test/mocks/BaseVaultMockMaxDeposit0.t.sol";
+import {BaseVaultMockReentrancy} from "@test/mocks/BaseVaultMockReentrancy.t.sol";
+import {IReentrancyCallback} from "@test/mocks/IReentrancyCallback.t.sol";
+import {MaliciousReentrancyAttacker} from "@test/mocks/MaliciousReentrancyAttacker.t.sol";
 
 contract BaseVaultTest is BaseTest {
     using SafeERC20 for IERC20Metadata;
@@ -325,5 +329,48 @@ contract BaseVaultTest is BaseTest {
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, GUARDIAN_ROLE)
         );
         baseVault.rescueTokens(address(weth), address(admin));
+    }
+
+    function test_BaseVault_readOnlyReentrancy_reverts() public {
+        // Deploy a vault mock that allows us to trigger reentrancy
+        BaseVaultMockReentrancy implementation = new BaseVaultMockReentrancy();
+
+        // Mint tokens for first deposit
+        _mint(erc20Asset, address(this), FIRST_DEPOSIT_AMOUNT);
+
+        // Compute the proxy address and approve tokens to it
+        bytes memory initializationData = abi.encodeCall(
+            BaseVault.initialize,
+            (
+                auth,
+                erc20Asset,
+                "Very Liquid Base USD Coin Mock Vault Reentrant",
+                "vlvBaseUSDCMockReentrant",
+                address(this),
+                FIRST_DEPOSIT_AMOUNT
+            )
+        );
+        bytes memory creationCode =
+            abi.encodePacked(type(ERC1967Proxy).creationCode, abi.encode(implementation, initializationData));
+        bytes32 salt = keccak256(initializationData);
+        address proxyAddress = Create2.computeAddress(salt, keccak256(creationCode));
+
+        // Approve tokens to the proxy
+        erc20Asset.forceApprove(proxyAddress, FIRST_DEPOSIT_AMOUNT);
+
+        // Deploy the proxy using Create2
+        address proxyDeployed = Create2.deploy(
+            0, salt, abi.encodePacked(type(ERC1967Proxy).creationCode, abi.encode(implementation, initializationData))
+        );
+        BaseVaultMockReentrancy reentrantVault = BaseVaultMockReentrancy(payable(proxyDeployed));
+
+        // Deploy malicious attacker contract
+        MaliciousReentrancyAttacker attacker = new MaliciousReentrancyAttacker(reentrantVault);
+
+        // Attempt to trigger read-only reentrancy
+        // This should revert because the attacker tries to call a view function
+        // (totalAssetsCap) while the vault is in a reentrant state
+        vm.expectRevert(ReentrancyGuardUpgradeable.ReentrancyGuardReentrantCall.selector);
+        reentrantVault.triggerReentrancy(address(attacker));
     }
 }
