@@ -1,4 +1,4 @@
-# very-liquid-vaults [![Coverage Status](https://coveralls.io/repos/github/SizeCredit/very-liquid-vaults/badge.svg?branch=main)](https://coveralls.io/github/SizeCredit/very-liquid-vaults?branch=main) [![CI](https://github.com/SizeCredit/very-liquid-vaults/actions/workflows/ci.yml/badge.svg)](https://github.com/SizeCredit/very-liquid-vaults/actions/workflows/ci.yml)
+# very-liquid-vaults [![Coverage Status](https://coveralls.io/repos/github/rheo-xyz/very-liquid-vaults/badge.svg?branch=main)](https://coveralls.io/github/rheo-xyz/very-liquid-vaults?branch=main) [![CI](https://github.com/rheo-xyz/very-liquid-vaults/actions/workflows/ci.yml/badge.svg)](https://github.com/rheo-xyz/very-liquid-vaults/actions/workflows/ci.yml)
 
 A modular, upgradeable ERC4626 vault system that enables flexible asset management through multiple investment strategies.
 
@@ -121,7 +121,7 @@ For bug reports, please refer to our [Bug Bounty Program](https://cantina.xyz/bo
 4. The vaults are not compatible with fee-on-transfer assets.
 5. The `ERC4626StrategyVault` cannot be used by vaults that take fees in assets on deposits or withdrawals. All integrated vaults must be strictly ERC-4626 compliant.
 6. Read-only reentrancy is not fully mitigated because of how contracts are inherited from OpenZeppelin's `openzeppelin-contracts-upgradeable` library. Practically all ERC20 and ERC4626 view functions cannot be guarded with a `nonReentrantView` modifier, since they are used internally in state-changing functions, which themselves are `nonReentrant`. If we applied `nonReentrantView` to public view functions that are used by nonpayable functions, these would revert.
-7. `SizeMetaVault`'s `max{Deposit,Withdraw,Mint,Redeem}` functions may experience precision loss when aggregating the maximum values from underlying strategies.
+7. `VeryLiquidVault`'s `max{Deposit,Withdraw,Mint,Redeem}` functions may experience precision loss when aggregating the maximum values from underlying strategies.
 8. `ERC4626StrategyVault`'s `max{Redeem,Mint}` functions may experience precision loss when converting between the integrated `vault`'s shares, assets, and strategy shares. In particular, this means a user's `balanceOf` may not always be fully `redeem`able, so users should always consult the `max` limits, as specified by ERC-4626.
 9. The `reorderStrategies` function has quadtratic complexity due to duplicate detection logic, which is acceptable for the current `MAX_STRATEGIES` cap.  
 10. The system assumes that integrated strategies are honest and non-malicious. A malicious or gas-griefing strategy could revert or consume excessive gas in `totalAssets` or other operations.  
