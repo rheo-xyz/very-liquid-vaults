@@ -16,3 +16,5 @@ console3=lib/console3/src
 @chimera/=lib/chimera/src/
 @recon/=lib/setup-helpers/src/
 @safe-utils/=lib/safe-utils/
+@morpho-blue/=lib/morpho-blue/src/
+@morpho-vault-v2/=lib/vault-v2/src/
