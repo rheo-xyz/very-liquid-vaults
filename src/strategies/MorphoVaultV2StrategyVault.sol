@@ -68,7 +68,7 @@ contract MorphoVaultV2StrategyVault is ERC4626StrategyVault {
         IVaultV2 v2 = IVaultV2(address(vault()));
         uint256 idle = IERC20(asset()).balanceOf(address(v2));
 
-        address liquidityAdapter;
+        address liquidityAdapter = address(0);
         try v2.liquidityAdapter() returns (address adapter) {
             liquidityAdapter = adapter;
         } catch {
@@ -76,7 +76,7 @@ contract MorphoVaultV2StrategyVault is ERC4626StrategyVault {
         }
         if (liquidityAdapter == address(0)) return idle;
 
-        bytes memory liquidityData;
+        bytes memory liquidityData = "";
         try v2.liquidityData() returns (bytes memory data) {
             liquidityData = data;
         } catch {
@@ -87,21 +87,21 @@ contract MorphoVaultV2StrategyVault is ERC4626StrategyVault {
         MarketParams memory marketParams = abi.decode(liquidityData, (MarketParams));
         Id id = marketParams.id();
 
-        uint256 vaultPosition;
+        uint256 vaultPosition = 0;
         try IMorphoMarketV1Adapter(liquidityAdapter).expectedSupplyAssets(Id.unwrap(id)) returns (uint256 assets) {
             vaultPosition = assets;
         } catch {
             return idle;
         }
 
-        address morpho;
+        address morpho = address(0);
         try IMorphoMarketV1Adapter(liquidityAdapter).morpho() returns (address morpho_) {
             morpho = morpho_;
         } catch {
             return idle;
         }
 
-        uint256 marketFree;
+        uint256 marketFree = 0;
         try IMorpho(morpho).market(id) returns (Market memory market) {
             marketFree = Math.saturatingSub(uint256(market.totalSupplyAssets), uint256(market.totalBorrowAssets));
         } catch {
