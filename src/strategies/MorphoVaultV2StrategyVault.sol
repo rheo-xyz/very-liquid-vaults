@@ -94,28 +94,37 @@ contract MorphoVaultV2StrategyVault is ERC4626StrategyVault {
             return idle;
         }
 
+        return idle + _marketExitable(liquidityAdapter, id);
+    }
+
+    /// @notice Assets withdrawable beyond the V2 vault's idle balance, served by the liquidity adapter's market.
+    /// @dev `min(ourSuppliedPosition, marketFree)` (see {_exitableLiquidity} for the accrual-invariance of
+    ///      `marketFree`). Factored out to keep each function small and single-purpose. Returns 0 on any failed
+    ///      external read, so the caller — which adds this term to idle — degrades to idle-only, preserving the
+    ///      never-revert contract.
+    function _marketExitable(address liquidityAdapter, Id id) internal view returns (uint256) {
         uint256 vaultPosition = 0;
         try IMorphoMarketV1Adapter(liquidityAdapter).expectedSupplyAssets(Id.unwrap(id)) returns (uint256 assets) {
             vaultPosition = assets;
         } catch {
-            return idle;
+            return 0;
         }
 
         address morpho = address(0);
         try IMorphoMarketV1Adapter(liquidityAdapter).morpho() returns (address morpho_) {
             morpho = morpho_;
         } catch {
-            return idle;
+            return 0;
         }
 
         uint256 marketFree = 0;
         try IMorpho(morpho).market(id) returns (Market memory market) {
             marketFree = Math.saturatingSub(uint256(market.totalSupplyAssets), uint256(market.totalBorrowAssets));
         } catch {
-            return idle;
+            return 0;
         }
 
-        return idle + Math.min(vaultPosition, marketFree);
+        return Math.min(vaultPosition, marketFree);
     }
 
     /// @notice Decodes `MarketParams` from raw `liquidityData`.
