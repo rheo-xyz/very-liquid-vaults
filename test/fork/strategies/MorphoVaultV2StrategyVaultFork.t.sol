@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {ERC4626Upgradeable} from "@openzeppelin-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
+
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 import {MorphoVaultV2StrategyVaultScript} from "@script/MorphoVaultV2StrategyVault.s.sol";
@@ -108,7 +110,11 @@ contract MorphoVaultV2StrategyVaultForkTest is ForkTest {
         assertGt(maxWithdraw, 0);
 
         vm.prank(alice);
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ERC4626Upgradeable.ERC4626ExceededMaxWithdraw.selector, alice, maxWithdraw + 1, maxWithdraw
+            )
+        );
         morphoV2StrategyVault.withdraw(maxWithdraw + 1, alice, alice);
 
         vm.prank(alice);

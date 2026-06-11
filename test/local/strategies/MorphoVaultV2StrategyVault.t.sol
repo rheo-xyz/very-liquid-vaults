@@ -52,7 +52,7 @@ contract MorphoVaultV2StrategyVaultTest is BaseTest {
         internal
         returns (MorphoMock morpho, MorphoMarketV1AdapterMock adapter, Id id)
     {
-        morpho = new MorphoMock();
+        morpho = new MorphoMock(IERC20(address(erc20Asset)));
         adapter = new MorphoMarketV1AdapterMock(address(morpho));
         MarketParams memory mp = _marketParams();
         id = mp.id();
@@ -103,6 +103,48 @@ contract MorphoVaultV2StrategyVaultTest is BaseTest {
         uint256 idle = erc20Asset.balanceOf(address(v2));
         uint256 marketFree = uint256(totalSupplyAssets - totalBorrowAssets);
         assertEq(strat.maxWithdraw(address(strat)), idle + Math.min(vaultPosition, marketFree));
+    }
+
+    /// @dev Finding 2: the market-liquidity clamp is *executable*, not just a reported number. Drive the market so
+    ///      free liquidity (`marketFree`) binds below the vault's position, then withdraw exactly the reported
+    ///      `maxWithdraw` end-to-end: idle is paid from the V2 vault and the remainder is deallocated from the market
+    ///      (which reverts if asked for more than `marketFree`). Success proves the resolver does not over-report —
+    ///      an over-estimate would pull more than `marketFree` and revert, re-introducing the `NullAmount` failure
+    ///      the Guardian de-risking loop exists to avoid.
+    function test_MorphoVaultV2StrategyVault_maxWithdraw_executable_at_market_liquidity_boundary() public {
+        VaultV2Mock v2 = _newVaultV2();
+        MorphoVaultV2StrategyVault strat = _deployStrategy(v2);
+
+        uint256 vaultPosition = 9e6;
+        uint128 totalSupplyAssets = 10e6;
+        uint128 totalBorrowAssets = 6e6; // marketFree = 4e6 < vaultPosition => the market clamp binds
+        (MorphoMock morpho,,) = _wireMarket(v2, vaultPosition, totalSupplyAssets, totalBorrowAssets);
+
+        // Simulate the allocator having supplied most idle into the market: move it from the V2 vault to the
+        // token-holding market singleton and book it as the supplied position, leaving only a small idle balance.
+        uint256 supplied = 9e6;
+        vm.prank(address(v2));
+        erc20Asset.transfer(address(morpho), supplied);
+        v2.setAllocatedAssets(supplied);
+
+        uint256 idle = erc20Asset.balanceOf(address(v2));
+        uint256 marketFree = uint256(totalSupplyAssets - totalBorrowAssets);
+        uint256 expectedMax = idle + marketFree;
+
+        // View binds on idle + marketFree, strictly below the (idle + position) the lying underlying could imply.
+        assertEq(strat.maxWithdraw(address(strat)), expectedMax);
+        assertLt(expectedMax, idle + vaultPosition);
+
+        // Execute exactly the reported max: idle from the vault + a marketFree-sized deallocation from the market.
+        uint256 recvBefore = erc20Asset.balanceOf(alice);
+        uint256 marketBefore = erc20Asset.balanceOf(address(morpho));
+        vm.prank(address(strat));
+        strat.withdraw(expectedMax, alice, address(strat));
+
+        // The receiver got the full reported max, and the shortfall above idle came out of the market (proving the
+        // marketFree branch executed, not just idle). No revert => view == executable at the liquidity boundary.
+        assertEq(erc20Asset.balanceOf(alice) - recvBefore, expectedMax);
+        assertEq(marketBefore - erc20Asset.balanceOf(address(morpho)), marketFree);
     }
 
     function test_MorphoVaultV2StrategyVault_maxWithdraw_binds_to_vault_position() public {
@@ -223,6 +265,22 @@ contract MorphoVaultV2StrategyVaultTest is BaseTest {
         // Non-zero adapter but liquidityData is not a 160-byte MarketParams => degrade before touching the adapter.
         v2.setLiquidityAdapter(address(0xADA9));
         v2.setLiquidityData(abi.encode(uint256(123)));
+
+        uint256 idle = erc20Asset.balanceOf(address(v2));
+        assertEq(strat.maxWithdraw(address(strat)), idle);
+    }
+
+    /// @dev Finding 1 regression: a malformed but correctly-sized (160-byte) `liquidityData` whose first word is not
+    ///      a clean address makes a bare `abi.decode` revert. The resolver decodes via a catchable self-call and must
+    ///      degrade to idle-only, since `maxWithdraw` runs inside {VeryLiquidVault} withdraw/rebalance (must not revert).
+    function test_MorphoVaultV2StrategyVault_degrades_when_liquidityData_decode_reverts() public {
+        VaultV2Mock v2 = _newVaultV2();
+        MorphoVaultV2StrategyVault strat = _deployStrategy(v2);
+        v2.setAllocatedAssets(BIG_POSITION);
+
+        // 160 bytes (passes the length gate), but the first (loanToken address) word has dirty upper bits.
+        v2.setLiquidityAdapter(address(0xADA9));
+        v2.setLiquidityData(abi.encodePacked(type(uint256).max, uint256(0), uint256(0), uint256(0), uint256(0)));
 
         uint256 idle = erc20Asset.balanceOf(address(v2));
         assertEq(strat.maxWithdraw(address(strat)), idle);

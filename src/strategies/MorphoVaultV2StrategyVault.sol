@@ -84,8 +84,15 @@ contract MorphoVaultV2StrategyVault is ERC4626StrategyVault {
         }
         // Not a Morpho Market V1 adapter's `MarketParams` (e.g. a different adapter type): degrade to idle-only.
         if (liquidityData.length != MARKET_PARAMS_LENGTH) return idle;
-        MarketParams memory marketParams = abi.decode(liquidityData, (MarketParams));
-        Id id = marketParams.id();
+        // `abi.decode` validates value types and reverts on malformed input (e.g. an address word with dirty upper
+        // bits, which an allocator can set via the no-timelock `setLiquidityAdapterAndData`). This resolver must never
+        // revert, so the decode is reached through an external self-call wrapped in try/catch (degrade to idle-only).
+        Id id = Id.wrap(bytes32(0));
+        try this.decodeMarketParams(liquidityData) returns (MarketParams memory marketParams) {
+            id = marketParams.id();
+        } catch {
+            return idle;
+        }
 
         uint256 vaultPosition = 0;
         try IMorphoMarketV1Adapter(liquidityAdapter).expectedSupplyAssets(Id.unwrap(id)) returns (uint256 assets) {
@@ -109,6 +116,14 @@ contract MorphoVaultV2StrategyVault is ERC4626StrategyVault {
         }
 
         return idle + Math.min(vaultPosition, marketFree);
+    }
+
+    /// @notice Decodes `MarketParams` from raw `liquidityData`.
+    /// @dev External (rather than an internal helper) solely so the decode is reachable through a `try/catch`
+    ///      self-call in {_exitableLiquidity}: Solidity's ABI decoder reverts on malformed input, and that resolver
+    ///      must never revert. Pure, reads no state, and has no side effects.
+    function decodeMarketParams(bytes calldata liquidityData) external pure returns (MarketParams memory) {
+        return abi.decode(liquidityData, (MarketParams));
     }
 
     /// @notice Whether this vault is allowed to enter (deposit into) the underlying V2 vault.

@@ -46,5 +46,8 @@
   },
   "lib/setup-helpers": {
     "rev": "0f7abac8f096768817cc7a1d2dcdb01ee8fb278e"
+  },
+  "lib/vault-v2": {
+    "rev": "02872d99d03ade7fa50583720506ed6cabc9c80b"
   }
 }
