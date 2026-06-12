@@ -25,6 +25,10 @@ contract ForkTest is BaseTest, Addresses {
     address public constant USDC_BASE_MAINNET = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     address public constant MORPHO_SPARK_USDC_VAULT_BASE_MAINNET = 0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A;
     address public constant EULER_BASE_USDC_VAULT_BASE_MAINNET = 0x0A1a3b5f2041F33522C4efc754a7D096f880eE16;
+    // Morpho Vault V2 (Steakhouse High Yield USDC). Unlike the Spark vault above (a V1, non-zero `maxRedeem`),
+    // this hardcodes all four ERC-4626 `max*` views to 0, which is exactly what {MorphoVaultV2StrategyVault} resolves.
+    address public constant MORPHO_STEAKHOUSE_HIGH_YIELD_USDC_VAULT_V2_BASE_MAINNET =
+        0xbeeff7aE5E00Aae3Db302e4B0d8C883810a58100;
 
     IERC4626 public erc4626Vault2;
     IVault public erc4626StrategyVault2;

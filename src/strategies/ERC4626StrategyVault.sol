@@ -60,12 +60,12 @@ contract ERC4626StrategyVault is NonReentrantVault {
 
     // ERC4626 OVERRIDES
     /// @notice Returns the maximum amount that can be deposited
-    function maxDeposit(address receiver) public view override(BaseVault) returns (uint256) {
+    function maxDeposit(address receiver) public view virtual override(BaseVault) returns (uint256) {
         return Math.min(vault().maxDeposit(address(this)), super.maxDeposit(receiver));
     }
 
     /// @notice Returns the maximum number of shares that can be minted
-    function maxMint(address receiver) public view override(BaseVault) returns (uint256) {
+    function maxMint(address receiver) public view virtual override(BaseVault) returns (uint256) {
         uint256 maxDepositReceiver = maxDeposit(receiver);
         // slither-disable-next-line incorrect-equality
         uint256 maxDepositInShares = maxDepositReceiver == type(uint256).max
@@ -75,12 +75,12 @@ contract ERC4626StrategyVault is NonReentrantVault {
     }
 
     /// @notice Returns the maximum amount that can be withdrawn by an owner
-    function maxWithdraw(address owner) public view override(BaseVault) returns (uint256) {
+    function maxWithdraw(address owner) public view virtual override(BaseVault) returns (uint256) {
         return Math.min(vault().maxWithdraw(address(this)), super.maxWithdraw(owner));
     }
 
     /// @notice Returns the maximum number of shares that can be redeemed
-    function maxRedeem(address owner) public view override(BaseVault) returns (uint256) {
+    function maxRedeem(address owner) public view virtual override(BaseVault) returns (uint256) {
         uint256 maxWithdrawOwner = maxWithdraw(owner);
         // slither-disable-next-line incorrect-equality
         uint256 maxWithdrawInShares = maxWithdrawOwner == type(uint256).max
