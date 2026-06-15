@@ -38,6 +38,10 @@ contract AaveV4StrategyVaultForkTest is ForkTestMainnet {
         uint256 redeemedAssets = aaveV4StrategyVault.redeem(maxRedeem, alice, alice);
         vm.stopPrank();
 
+        // Principal preserved: a week's accrual exceeds ERC4626 floor-rounding dust here. This runs against live
+        // (latest-block) state, so if a future run lands in a near-zero-utilization window where weekly yield dips
+        // below that dust, warp longer or relax to a 1-2 wei tolerance (assertApproxGeAbs). The accrual itself is
+        // already proven above (valueAfterAccrual >= valueAfterDeposit), independent of this round-trip's rounding.
         assertGe(redeemedAssets, amount);
     }
 
@@ -106,6 +110,10 @@ contract AaveV4StrategyVaultForkTest is ForkTestMainnet {
         uint256 holderAssets = aaveV4StrategyVault.convertToAssets(aaveV4StrategyVault.balanceOf(alice));
         uint256 lowLiquidity = 5e6; // strictly below the holder's ~100 USDC position, so the liquidity clamp binds
         _setAssetLiquidity(lowLiquidity);
+        // `getAssetLiquidity` returns the raw `_assets[id].liquidity` field (already maintained net of `swept` by the
+        // Hub) that `_setAssetLiquidity` overwrites directly, so this equality is exact and independent of the live
+        // `swept` value. (On a re-pin where `swept` matters for execution, keep `lowLiquidity` a plain absolute floor
+        // as here.) The assertEq also self-validates the storage slot — a layout change fails loudly.
         assertEq(aaveV4Hub.getAssetLiquidity(usdcAssetId), lowLiquidity);
         assertLt(lowLiquidity, holderAssets);
 

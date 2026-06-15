@@ -34,8 +34,22 @@ contract ForkTestMainnet is BaseTest {
     address public constant AAVE_V4_CORE_HUB = 0xCca852Bc40e560adC3b1Cc58CA5b55638ce826c9;
     address public constant AAVE_V4_HUB_CONFIGURATOR = 0x1F0753480bB03EaA00863224602267B7E0525C3d;
 
-    /// @dev Slot of the `_assets` mapping in `HubStorage` (slot 0 is `_assetCount`). Verified on-fork: the low 120
-    ///      bits of `keccak256(abi.encode(assetId, _ASSETS_SLOT))` equal `getAssetLiquidity(assetId)`.
+    // Upgrade authority for the Core USDC TokenizationSpoke. The exit guarantee this strategy relies on lives in
+    // that *upgradeable* contract (issue #11 residual risk §8.1), so the Guardian must watch it for upgrades: the
+    // spoke is a transparent proxy whose EIP-1967 admin is an OZ `ProxyAdmin`, owned by an Aave governance Safe
+    // (5-of-N as of writing). Watch the proxy for `Upgraded`, the `ProxyAdmin` for `upgrade*`/`OwnershipTransferred`,
+    // and the Safe for queued upgrade txs. Verified on-fork 2026-06 (impl then was
+    // 0x1Ee96dcB226Cccf609C80DC394BadcBF47D05326); re-confirm after any Aave V4 governance migration.
+    address public constant AAVE_V4_CORE_USDC_TSPOKE_PROXY_ADMIN = 0x4bF82e863EA27B9CCB1FD1Bd72671cc99D8d4DBa;
+    address public constant AAVE_V4_CORE_USDC_TSPOKE_UPGRADE_AUTHORITY = 0x187AAE17d4931310B3fc75743e7F16Bdc9eD77e9;
+
+    /// @dev Storage slot of the `_assets` mapping in Aave V4's `HubStorage`. Derived from `HubStorage` field order:
+    ///      `_assetCount` @ slot 0, then `_assets` @ slot 1 — `AccessManagedUpgradeable` uses ERC-7201 namespaced
+    ///      storage so it contributes no sequential slots. Cannot use `forge inspect Hub storage-layout` here
+    ///      (aave-v4 is pragma 0.8.28, not a buildable submodule under this repo's 0.8.26). Safe regardless: the slot
+    ///      is verified on-fork (low 120 bits of `keccak256(abi.encode(assetId, _ASSETS_SLOT))` equal
+    ///      `getAssetLiquidity(assetId)`) and every write is self-validated by a follow-up `getAssetLiquidity`
+    ///      assertion, so an upstream layout change fails the test loudly rather than silently corrupting state.
     uint256 private constant _ASSETS_SLOT = 1;
 
     IAaveV4Hub internal aaveV4Hub = IAaveV4Hub(AAVE_V4_CORE_HUB);
