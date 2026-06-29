@@ -20,7 +20,10 @@ abstract contract Addresses {
         VeryLiquidVault_Frontier,
         ERC4626StrategyVault_Morpho_Spark,
         ERC4626StrategyVault_Morpho_Gauntlet_Prime,
-        ERC4626StrategyVault_Morpho_Moonwell_Flagship
+        ERC4626StrategyVault_Morpho_Moonwell_Flagship,
+        // Aave V4 Core USDC TokenizationSpoke strategy (issue #11), Ethereum-mainnet-only. Appended to preserve the
+        // ordinals of the entries above. Address is assigned after the mainnet deploy (see Ethereum section below).
+        ERC4626StrategyVault_AaveV4_Core_USDC
     }
 
     mapping(uint256 chainId => mapping(Contract c => address a)) public addresses;
@@ -55,6 +58,11 @@ abstract contract Addresses {
         erc4626StrategyVaults[1].push(addresses[1][Contract.ERC4626StrategyVault_Morpho_MEV_Capital]);
         veryLiquidVaults[1].push(addresses[1][Contract.VeryLiquidVault_Core]);
         veryLiquidVaults[1].push(addresses[1][Contract.VeryLiquidVault_Frontier]);
+
+        // Aave V4 Core USDC strategy (issue #11). Deploy with the existing ERC4626StrategyVault script
+        // (VAULT=0x531E90a2376902DE8915789Fcc1075e3B0c153E7, AUTH=mainnet Auth above), then uncomment to register:
+        // addresses[1][Contract.ERC4626StrategyVault_AaveV4_Core_USDC] = 0x...; // deployed proxy
+        // erc4626StrategyVaults[1].push(addresses[1][Contract.ERC4626StrategyVault_AaveV4_Core_USDC]);
 
         // Base
         addresses[8453][Contract.GovernanceMultisig] = 0xa9c62d9E0F2208456E50B208aE2547F36Bc3452d;

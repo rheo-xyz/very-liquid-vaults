@@ -77,7 +77,7 @@ For bug reports, please refer to our [Bug Bounty Program](https://cantina.xyz/bo
 
 * Supports allocation across:
   * Cash
-  * Aave
+  * Aave (V3 and V4)
   * Morpho/Euler
 * Liquidity is fungible: all users share average yield
 * Default deposit destination is Cash for instant liquidity (as defined by the strategist)
@@ -99,8 +99,8 @@ For bug reports, please refer to our [Bug Bounty Program](https://cantina.xyz/bo
 ### Available Strategies
 
 1. **`CashStrategyVault`**: Simple cash-holding strategy (no yield generation)
-2. **`AaveStrategyVault`**: Aave lending protocol integration for yield generation
-3. **`ERC4626StrategyVault`**: Generic wrapper for other ERC4626 vaults (e.g., Morpho). Only ERC-4626 vaults passing the [integration checklist](https://github.com/aviggiano/security/blob/v0.1.0/audit-checklists/ERC-4626-integration.md) will be considered.
+2. **`AaveStrategyVault`**: Aave **V3** lending protocol integration for yield generation (bespoke adapter)
+3. **`ERC4626StrategyVault`**: Generic wrapper for other ERC4626 vaults (e.g., Morpho, Euler, and Aave **V4**). Only ERC-4626 vaults passing the [integration checklist](https://github.com/aviggiano/security/blob/v0.1.0/audit-checklists/ERC-4626-integration.md) will be considered. **Aave V4** (Ethereum-mainnet-only) supply exposure is integrated through this wrapper directly, with no bespoke adapter: each asset's `TokenizationSpoke` is a standard ERC-4626 whose `maxWithdraw`/`maxRedeem` already fold in the Hub's available liquidity and the spoke's `active`/`halted` kill-switches, so the de-risking exit sensor propagates honestly through the existing `min(...)` plumbing. Note that this liquidity is shared across all spokes drawing on the same Hub asset, and the exit guarantee lives in Aave's upgradeable spoke.
 4. **`MorphoVaultV2StrategyVault`**: Specialized wrapper for [Morpho Vault V2](https://github.com/morpho-org/vault-v2) venues. Morpho V2 hardcodes all four ERC-4626 `max*` views to `0` (an arbitrary gate could reject any caller/amount, so `0` is the only revert-safe value it can promise), which would brick the generic `ERC4626StrategyVault` (it clamps `min(0, ...) = 0`). This subclass replaces those four views with an on-chain liquidity resolver computed from Morpho Vault V2 / Morpho Blue primitives, while reusing the audited deposit/withdraw/`totalAssets` paths (V2's actual `deposit`/`withdraw` execution works; only its views lie).
 
 ## Roles and Permissions
